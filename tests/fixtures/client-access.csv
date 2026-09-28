@@ -1,0 +1,15 @@
+user_id,email,stripe_customer_id,plan
+u1,ok1@example.com,cus_Ok1,pro
+u1b,ok1@example.com,cus_ok1,pro
+u2,ok2@example.com,cus_Ok2,pro
+u3,ok3@example.com,cus_Ok3,free
+u4,pna1@example.com,cus_Pna1,free
+u5,pna2@example.com,cus_Pna2,none
+u6,pna3@example.com,cus_Pna3,
+u7,anp1@example.com,cus_Anp1,pro
+u8,anp2@example.com,cus_Anp2,team
+u9,pd1@example.com,cus_Pd1,pro
+u10,multi@example.com," CUS_MULTI9 ",pro
+u11,ao1@example.com,cus_Ao1,pro
+u12,ar1@example.com,cus_Ar1,pro
+u13,ai1@example.com,cus_Ai1,free

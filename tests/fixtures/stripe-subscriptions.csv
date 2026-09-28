@@ -1,0 +1,17 @@
+id,Customer ID,Customer Email,Status,Plan,Amount,Interval
+sub_01,cus_Ok1,ok1@example.com,active,Pro,49.00,month
+sub_02,cus_Ok2,ok2@example.com,trialing,Pro,49.00,month
+sub_03,cus_Ok3,ok3@example.com,canceled,Pro,49.00,month
+sub_04,cus_Pna1,pna1@example.com,active,Pro,49.00,month
+sub_05,cus_Pna2,pna2@example.com,active,Team,99.00,month
+sub_06,cus_Pna3,pna3@example.com,trialing,Starter,29.00,month
+sub_07,cus_Anp1,anp1@example.com,canceled,Pro,49.00,month
+sub_08,cus_Anp2,anp2@example.com,unpaid,Basic,19.00,month
+sub_09,cus_Pd1,pd1@example.com,past_due,Pro,49.00,month
+sub_10,cus_So1,so1@example.com,active,Pro,49.00,month
+sub_11,cus_Multi9,multi@example.com,canceled,Starter,29.00,month
+sub_12,cus_Multi9,multi@example.com,active,Pro,49.00,month
+sub_13,,ghost@example.com,active,Pro,49.00,month
+sub_14,cus_Sop1,sop1@example.com,active,Pro,49.00,month
+sub_15,cus_Sop2,sop2@example.com,active,Team,588.00,year
+sub_16,cus_Sin1,sin1@example.com,canceled,Pro,49.00,month

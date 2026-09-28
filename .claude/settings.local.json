@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Users\\\\COTR\\\\Desktop\\\\BugAudit\")",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(git check-ignore *)",
+      "Bash(npm run *)",
+      "Bash(env)",
+      "Bash(npx --no-install supabase --version)"
+    ]
+  }
+}
