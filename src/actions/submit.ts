@@ -18,7 +18,8 @@ const InputSchema = z.object({
       'Should look like a URL or a git SSH address.',
     ),
   tech_stack: z.string().trim().max(300).optional().nullable(),
-  email: z.string().trim().email('That email doesn’t look right.').max(320),
+  // Stored lowercase so the Stripe webhook can match with an exact .eq().
+  email: z.string().trim().toLowerCase().email('That email doesn’t look right.').max(320),
 });
 
 export type SubmitState =

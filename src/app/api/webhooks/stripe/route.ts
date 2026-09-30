@@ -92,11 +92,14 @@ async function matchAndMarkSold(
 
   const supabase = createSupabaseServiceClient();
 
-  // Case-insensitive email match, most recent submission wins.
+  // Exact match, most recent submission wins. Emails are stored lowercase
+  // (submitLead + DB check constraint) and `email` is lowercased above.
+  // Not .ilike(): that treats `_` and `%` as wildcards, so a payment from
+  // a_b@x.com could mark the submission of axb@x.com as sold.
   const { data: matches, error: findErr } = await supabase
     .from('submissions')
     .select('id')
-    .ilike('email', email)
+    .eq('email', email)
     .order('created_at', { ascending: false })
     .limit(1);
 

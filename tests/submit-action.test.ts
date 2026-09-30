@@ -81,6 +81,12 @@ describe('submitLead', () => {
     expect(h.sendEmail.mock.calls[0]![0].text).toContain(`Submission id: ${String(id)}`);
   });
 
+  it('stores the email trimmed and lowercased (webhook matches with exact .eq)', async () => {
+    await submitLead(IDLE, form({ email: '  Lead.Name@Example.COM ' }));
+
+    expect(h.inserts[0]!.row.email).toBe('lead.name@example.com');
+  });
+
   it('returns a neutral error without leaking the DB message', async () => {
     h.insertError = { code: '42501', message: 'new row violates row-level security policy' };
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});

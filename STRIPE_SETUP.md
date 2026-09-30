@@ -44,21 +44,37 @@ Return `session.url` to the client and `window.location.href = url`.
 
 `src/app/api/webhooks/stripe/route.ts`:
 
+In Stripe Dashboard → Developers → Webhooks, the endpoint must be
+subscribed to `checkout.session.completed`,
+`checkout.session.async_payment_succeeded` and
+`checkout.session.async_payment_failed`, or the async events never arrive.
+
 1. **Read raw body** (`await req.text()`) — do NOT parse to JSON before
    signature verification.
 2. **Verify signature** with `stripe.webhooks.constructEvent(rawBody,
    sigHeader, env.STRIPE_WEBHOOK_SECRET)`. Return `400` on failure.
-3. **Handle `checkout.session.completed`** only. Ignore other events
-   (return `200`).
-4. **Match by `customer_email`** against `submissions.email`
-   (case-insensitive, most recent submission wins).
+3. **Handle three events**; ignore everything else (return `200`):
+   - `checkout.session.completed` — act only if `payment_status === 'paid'`.
+     Delayed methods (ACH, SEPA, ...) arrive here as `unpaid` and settle later.
+   - `checkout.session.async_payment_succeeded` — treat as paid.
+   - `checkout.session.async_payment_failed` — leave status alone, email admin.
+4. **Match by `customer_email`** (falling back to `customer_details.email`)
+   against `submissions.email` with an exact `.eq()` on the lowercased
+   address; most recent submission wins. Emails are stored lowercase
+   (`submitLead` + a DB check constraint). Do not use `.ilike()` — `_` and
+   `%` are wildcards there.
 5. On match: `UPDATE submissions SET status = 'Fix-It Sold',
    stripe_session_id = <id> WHERE id = <matched>`.
 6. On no match: `console.warn` and return `200` — do NOT fail the webhook,
    we still want Stripe to consider it delivered so it doesn't retry
    forever.
-7. On DB write failure: return `500` so Stripe retries (per Stripe's
+7. On DB read/write failure: return `500` so Stripe retries (per Stripe's
    exponential-backoff policy, up to 3 days).
+8. **Every paid checkout emails `ADMIN_EMAIL`** (session id, amount,
+   currency, customer email, matched submission id or `NO MATCH`) — on
+   every outcome in 4–7, so a payment is never lost silently. The email is
+   best-effort: a Resend failure is logged and never changes the response
+   code.
 
 ## Local testing
 
@@ -70,7 +86,9 @@ stripe trigger checkout.session.completed
 
 ## Idempotency
 
-Stripe may deliver the same event more than once. Our handler is
+Stripe may deliver the same event more than once. The DB update is
 idempotent because setting `status = 'Fix-It Sold'` a second time is a
-no-op. If you add side effects (email, invoice), gate them on
-`stripe_session_id IS NULL` before the update.
+no-op. The admin email is deliberately NOT deduplicated: a redelivery or a
+retry after a `500` sends it again. Duplicates are preferred over a
+missed payment. If you add customer-facing side effects (invoice, receipt),
+gate those on `stripe_session_id IS NULL` before the update.

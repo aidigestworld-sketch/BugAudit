@@ -241,3 +241,31 @@ describe('stripe webhook — admin email on every paid checkout', () => {
     expect(retry.status).toBe(500);
   });
 });
+
+describe('stripe webhook — email matching', () => {
+  const lookup = () => h.queries.find((q) => q.ops.some(([m]) => m === 'select'))!;
+
+  it('matches with an exact .eq on the lowercased, trimmed email — never .ilike', async () => {
+    await deliver(
+      'checkout.session.completed',
+      session({ customer_email: '  A_B%@Example.COM ', customer_details: null }),
+    );
+
+    expect(lookup().ops).toContainEqual(['eq', 'email', 'a_b%@example.com']);
+    expect(lookup().ops.map(([m]) => m)).not.toContain('ilike');
+  });
+
+  it('prefers customer_email over customer_details.email', async () => {
+    await deliver(
+      'checkout.session.completed',
+      session({ customer_email: 'first@example.com', customer_details: { email: 'second@example.com' } }),
+    );
+    expect(lookup().ops).toContainEqual(['eq', 'email', 'first@example.com']);
+  });
+
+  it('picks the most recent submission', async () => {
+    await deliver('checkout.session.completed');
+    expect(lookup().ops).toContainEqual(['order', 'created_at', { ascending: false }]);
+    expect(lookup().ops).toContainEqual(['limit', 1]);
+  });
+});
