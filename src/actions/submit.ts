@@ -1,9 +1,11 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { resend } from '@/lib/resend';
 import { serverEnv } from '@/lib/env';
+import type { SubmissionInsert } from '@/types/db';
 
 const InputSchema = z.object({
   repo_link: z
@@ -50,19 +52,20 @@ export async function submitLead(
     };
   }
 
-  // RLS allows anon INSERT — no service-role needed here.
+  // RLS allows anon INSERT but deliberately no SELECT, so do NOT chain
+  // .select()/.single() here: INSERT ... RETURNING needs SELECT permission
+  // and fails with 42501. Generate the id ourselves instead.
+  const id = randomUUID();
+  const row: SubmissionInsert = {
+    id,
+    repo_link: parsed.data.repo_link,
+    tech_stack: parsed.data.tech_stack ?? null,
+    email: parsed.data.email,
+  };
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from('submissions')
-    .insert({
-      repo_link: parsed.data.repo_link,
-      tech_stack: parsed.data.tech_stack ?? null,
-      email: parsed.data.email,
-    })
-    .select('id')
-    .single();
+  const { error } = await supabase.from('submissions').insert(row);
 
-  if (error || !data) {
+  if (error) {
     console.error('[submitLead] insert failed', error);
     return {
       status: 'error',
@@ -85,7 +88,7 @@ export async function submitLead(
         `Stack: ${parsed.data.tech_stack ?? '(not provided)'}`,
         `Email: ${parsed.data.email}`,
         ``,
-        `Submission id: ${data.id}`,
+        `Submission id: ${id}`,
         `Open the dashboard: ${env.NEXT_PUBLIC_SITE_URL}/admin`,
       ].join('\n'),
     });

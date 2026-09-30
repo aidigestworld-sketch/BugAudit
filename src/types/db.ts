@@ -43,6 +43,7 @@ export type ReconciliationRun = {
 export type ReconciliationRunInsert = Omit<ReconciliationRun, 'id' | 'run_at'>;
 
 export type SubmissionInsert = {
+  id?: string;
   repo_link: string;
   tech_stack?: string | null;
   email: string;
