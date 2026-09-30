@@ -60,13 +60,34 @@ export async function POST(req: Request) {
   }
 }
 
+/**
+ * Every paid checkout emails the admin — matched or not, DB healthy or not —
+ * so money never arrives without a human hearing about it. On a 5xx Stripe
+ * retries, which can repeat the email; duplicates beat silence.
+ */
 async function markSold(session: Stripe.Checkout.Session): Promise<NextResponse> {
+  const { response, matchLine } = await matchAndMarkSold(session);
+  await notifyAdmin(`[Revenue-Bug Audit] Payment received for ${session.id}`, [
+    'A fix-it engagement checkout was paid.',
+    '',
+    ...sessionLines(session),
+    `Match:    ${matchLine}`,
+  ]);
+  return response;
+}
+
+async function matchAndMarkSold(
+  session: Stripe.Checkout.Session,
+): Promise<{ response: NextResponse; matchLine: string }> {
   const email = customerEmail(session);
   if (!email) {
     console.warn('[stripe webhook] no email on session, skipping match', {
       sessionId: session.id,
     });
-    return NextResponse.json({ received: true, matched: false });
+    return {
+      response: NextResponse.json({ received: true, matched: false }),
+      matchLine: 'NO MATCH (no email on session)',
+    };
   }
 
   const supabase = createSupabaseServiceClient();
@@ -82,7 +103,10 @@ async function markSold(session: Stripe.Checkout.Session): Promise<NextResponse>
   if (findErr) {
     console.error('[stripe webhook] lookup failed', findErr);
     // Return 5xx so Stripe retries.
-    return NextResponse.json({ error: 'lookup failed' }, { status: 500 });
+    return {
+      response: NextResponse.json({ error: 'lookup failed' }, { status: 500 }),
+      matchLine: 'NO MATCH (submission lookup failed; Stripe will retry)',
+    };
   }
 
   const match = matches?.[0];
@@ -92,7 +116,10 @@ async function markSold(session: Stripe.Checkout.Session): Promise<NextResponse>
       email,
     });
     // 200 — don't have Stripe retry a non-match forever.
-    return NextResponse.json({ received: true, matched: false });
+    return {
+      response: NextResponse.json({ received: true, matched: false }),
+      matchLine: 'NO MATCH',
+    };
   }
 
   const { error: updateErr } = await supabase
@@ -106,10 +133,16 @@ async function markSold(session: Stripe.Checkout.Session): Promise<NextResponse>
   if (updateErr) {
     console.error('[stripe webhook] update failed', updateErr);
     // 5xx → Stripe retries.
-    return NextResponse.json({ error: 'update failed' }, { status: 500 });
+    return {
+      response: NextResponse.json({ error: 'update failed' }, { status: 500 }),
+      matchLine: `${match.id} (status update FAILED; Stripe will retry)`,
+    };
   }
 
-  return NextResponse.json({ received: true, matched: true, id: match.id });
+  return {
+    response: NextResponse.json({ received: true, matched: true, id: match.id }),
+    matchLine: match.id,
+  };
 }
 
 function customerEmail(session: Stripe.Checkout.Session): string {

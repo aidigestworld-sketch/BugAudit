@@ -165,3 +165,79 @@ describe('stripe webhook — payment status', () => {
     expect(h.queries).toHaveLength(0);
   });
 });
+
+describe('stripe webhook — admin email on every paid checkout', () => {
+  const lastEmail = () => h.sendEmail.mock.calls.at(-1)![0] as { subject: string; text: string };
+
+  it('includes session id, amount, currency, customer email and the matched id', async () => {
+    await deliver('checkout.session.completed');
+
+    expect(h.sendEmail).toHaveBeenCalledOnce();
+    const { text } = lastEmail();
+    expect(text).toContain('cs_test_123');
+    expect(text).toContain('19900');
+    expect(text).toContain('USD');
+    expect(text).toContain('lead@example.com');
+    expect(text).toContain(`Match:    ${SUBMISSION_ID}`);
+  });
+
+  it('emails on async_payment_succeeded too', async () => {
+    await deliver('checkout.session.async_payment_succeeded');
+    expect(h.sendEmail).toHaveBeenCalledOnce();
+  });
+
+  it('emails NO MATCH when no submission has the email', async () => {
+    h.rows = [];
+    const res = await deliver('checkout.session.completed');
+
+    expect(res).toEqual({ status: 200, body: { received: true, matched: false } });
+    expect(lastEmail().text).toContain('Match:    NO MATCH');
+  });
+
+  it('emails NO MATCH when the session carries no email at all', async () => {
+    const res = await deliver(
+      'checkout.session.completed',
+      session({ customer_email: null, customer_details: null }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(h.queries).toHaveLength(0);
+    expect(lastEmail().text).toContain('NO MATCH');
+  });
+
+  it('still emails when the lookup fails, and keeps the 500 so Stripe retries', async () => {
+    h.findError = { message: 'connection reset' };
+    const res = await deliver('checkout.session.completed');
+
+    expect(res.status).toBe(500);
+    expect(lastEmail().text).toContain('NO MATCH');
+    expect(lastEmail().text).not.toContain('connection reset');
+  });
+
+  it('still emails when the update fails, and keeps the 500', async () => {
+    h.updateError = { message: 'boom' };
+    const res = await deliver('checkout.session.completed');
+
+    expect(res.status).toBe(500);
+    expect(lastEmail().text).toContain(SUBMISSION_ID);
+  });
+
+  it('does not email for an unpaid completed session', async () => {
+    await deliver('checkout.session.completed', session({ payment_status: 'unpaid' }));
+    expect(h.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['throws', () => h.sendEmail.mockRejectedValue(new Error('resend down'))],
+    ['returns an error', () => h.sendEmail.mockResolvedValue({ data: null, error: { message: 'rate limited' } })],
+  ])('response code is unchanged when Resend %s', async (_label, breakResend) => {
+    breakResend();
+    const ok = await deliver('checkout.session.completed');
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ matched: true });
+
+    h.findError = { message: 'db down' };
+    const retry = await deliver('checkout.session.completed');
+    expect(retry.status).toBe(500);
+  });
+});
