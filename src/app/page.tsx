@@ -1,12 +1,20 @@
+import { Suspense } from 'react';
 import { TerminalPreview } from '@/components/landing/terminal-preview';
 import { IntakeForm } from '@/components/landing/intake-form';
 import { FixItCta } from '@/components/landing/fix-it-cta';
+import { CheckoutNotice } from '@/components/landing/checkout-notice';
 import { Card } from '@/components/ui/card';
 
 export default function LandingPage() {
   return (
     <main className="mx-auto max-w-4xl px-6 py-12 md:py-20">
       <Header />
+
+      <div className="mt-8 empty:hidden">
+        <Suspense fallback={null}>
+          <CheckoutNotice />
+        </Suspense>
+      </div>
 
       <section className="mt-10 space-y-4">
         <h1 className="text-3xl md:text-5xl font-mono font-bold tracking-tight text-text">
@@ -46,7 +54,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mt-6">
+      <section id="fix-it" className="mt-6 scroll-mt-6">
         <FixItCta />
       </section>
 
